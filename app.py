@@ -6,7 +6,7 @@ import os
 from json_data import sample_results
 from schema import Relationship, RelationshipList, RelationshipLite, RelationshipLiteList
 from utils import convert_to_lite, get_dataframe, df2json, get_unique_entities
-from llm import process_documents
+from llm import process_documents, extract_graph
 
 
 def initialize_session_state():
@@ -86,7 +86,6 @@ def main():
                 st.error("OpenAI API key not found. Please set it as an environment variable or enter it in the sidebar.")
             else:
                 os.environ["OPENAI_API_KEY"] = api_key
-            print("st.session_state.relationships_extracted: ", st.session_state.relationships_extracted)
             if not st.session_state.relationships_extracted:
                 with st.spinner("Processing documents..."):
                     st.session_state.extracted_relationships = process_documents(uploaded_files)
@@ -100,5 +99,7 @@ def main():
             allowed_entities = get_unique_entities(st.session_state.edited_df)
             st.header("Allowed Entities:")
             st.write(allowed_entities)
+        if st.button("Extract Graph"):
+            extract_graph(uploaded_files, allowed_relationships, allowed_entities)
 if __name__ == "__main__":
     main()

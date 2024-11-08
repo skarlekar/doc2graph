@@ -5,12 +5,15 @@ from json_data import sample_results
 import streamlit as st
 import json
 from langchain_openai import ChatOpenAI
+from langchain_experimental.graph_transformers import LLMGraphTransformer
+from langchain_core.documents import Document
 import json
-from typing import List
+from typing import List, Dict
 import PyPDF2
 import docx
 import io
 from prompts import ENTITY_EXTRACTION_PROMPT
+from config import LLM_CONFIG
 
 def read_pdf(file) -> str:
     pdf_reader = PyPDF2.PdfReader(file)
@@ -58,8 +61,8 @@ def process_documents_sample(files: List) -> List[RelationshipLite]:
 # Process the documents and extract the relationships
 def process_documents(files: List) -> List[RelationshipLite]:
     llm = ChatOpenAI(
-        model="gpt-4o-mini",
-        temperature=0
+        model=LLM_CONFIG["model"],
+        temperature=LLM_CONFIG["temperature"]
     )
 
     all_results = []
@@ -118,3 +121,19 @@ def process_documents(files: List) -> List[RelationshipLite]:
             continue
             
     return all_results
+
+def extract_graph(files: List, allowed_relationships: List[str], allowed_nodes: List[str]) -> Dict:
+    llm = ChatOpenAI(
+        model=LLM_CONFIG["model"],
+        temperature=LLM_CONFIG["temperature"]
+    )
+
+    # Create a graph transformer
+    graph_transformer = LLMGraphTransformer(llm=llm, allowed_relationships=allowed_relationships, allowed_nodes=allowed_nodes)
+
+    for file in files:
+        content = extract_content(file)
+        documents = [Document(page_content=content)]
+        graph = graph_transformer.convert_to_graph_documents(documents)
+        print(f"Nodes:{graph[0].nodes}")
+        print(f"Relationships:{graph[0].relationships}")
