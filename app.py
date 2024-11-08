@@ -19,9 +19,14 @@ def initialize_session_state():
     if 'openai_api_key' not in st.session_state:
         # Initialize with environment variable if available
         st.session_state.openai_api_key = os.getenv("OPENAI_API_KEY", "")
-    st.session_state.edited_df = pd.DataFrame()
+    if 'edited_df' not in st.session_state:
+        st.session_state.edited_df = pd.DataFrame()
+    if 'relationships_extracted' not in st.session_state:
+        st.session_state.relationships_extracted = False
+    if 'extracted_relationships' not in st.session_state:
+        st.session_state.extracted_relationships = []
 
-def display_extraction_results(results: List[RelationshipLite]):
+def display_extraction_relationships(relationships: List[RelationshipLite]):
     # Configure columns
     column_configuration = {
         "From": st.column_config.TextColumn("From", width=200),
@@ -29,7 +34,7 @@ def display_extraction_results(results: List[RelationshipLite]):
         "To": st.column_config.TextColumn("To", width=200)
     }
 
-    df = get_dataframe(results)
+    df = get_dataframe(relationships)
 
     st.header("Relationships")
     st.write("Edit the entities and relationships in the table below. When you are done, click the 'Extract' button to extract the information from the documents.")
@@ -37,7 +42,7 @@ def display_extraction_results(results: List[RelationshipLite]):
                               column_config=column_configuration,
                               use_container_width=True,
                               num_rows="dynamic",
-                              hide_index=False)
+                              hide_index=False,)
     st.session_state.edited_df = edited_df
 
 def main():
@@ -81,10 +86,12 @@ def main():
                 st.error("OpenAI API key not found. Please set it as an environment variable or enter it in the sidebar.")
             else:
                 os.environ["OPENAI_API_KEY"] = api_key
-            llm_results = []
-            with st.spinner("Processing documents..."):
-                llm_results = process_documents(uploaded_files)
-            display_extraction_results(llm_results)
+            print("st.session_state.relationships_extracted: ", st.session_state.relationships_extracted)
+            if not st.session_state.relationships_extracted:
+                with st.spinner("Processing documents..."):
+                    st.session_state.extracted_relationships = process_documents(uploaded_files)
+                    st.session_state.relationships_extracted = True
+            display_extraction_relationships(st.session_state.extracted_relationships)
             st.header("Relationships to Extract:")
             st.write(st.session_state.edited_df)
 if __name__ == "__main__":
