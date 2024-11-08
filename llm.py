@@ -1,7 +1,8 @@
 from typing import List
 from schema import Relationship, RelationshipList, RelationshipLite, RelationshipLiteList
-from utils import convert_to_lite
+from utils import convert_to_lite, get_dataframe, df2json, get_unique_entities
 from json_data import sample_results
+import pandas as pd
 import streamlit as st
 import json
 from langchain_openai import ChatOpenAI
@@ -14,6 +15,7 @@ import docx
 import io
 from prompts import ENTITY_EXTRACTION_PROMPT
 from config import LLM_CONFIG
+
 
 def read_pdf(file) -> str:
     pdf_reader = PyPDF2.PdfReader(file)
@@ -122,18 +124,27 @@ def process_documents(files: List) -> List[RelationshipLite]:
             
     return all_results
 
-def extract_graph(files: List, allowed_relationships: List[str], allowed_nodes: List[str]) -> Dict:
+def extract_graph(files: List, edited_df: pd.DataFrame) -> Dict:
     llm = ChatOpenAI(
         model=LLM_CONFIG["model"],
         temperature=LLM_CONFIG["temperature"]
     )
 
+    allowed_relationships = df2json(edited_df)
+    allowed_nodes = get_unique_entities(edited_df)
+
+    print(f"Allowed Relationships: {allowed_relationships}")
+    print(f"Allowed Nodes: {allowed_nodes}")    
+
     # Create a graph transformer
-    graph_transformer = LLMGraphTransformer(llm=llm, allowed_relationships=allowed_relationships, allowed_nodes=allowed_nodes)
+    graph_transformer = LLMGraphTransformer(llm=llm, allowed_relationships=allowed_relationships, allowed_nodes=allowed_nodes, node_properties=True)
 
     for file in files:
         content = extract_content(file)
         documents = [Document(page_content=content)]
         graph = graph_transformer.convert_to_graph_documents(documents)
+        print("-"*100)
         print(f"Nodes:{graph[0].nodes}")
+        print("-"*100)
         print(f"Relationships:{graph[0].relationships}")
+        print("-"*100)

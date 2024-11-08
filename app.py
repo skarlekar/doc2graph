@@ -26,7 +26,7 @@ def initialize_session_state():
     if 'extracted_relationships' not in st.session_state:
         st.session_state.extracted_relationships = []
 
-def display_extraction_relationships(relationships: List[RelationshipLite]):
+def display_extraction_relationships(relationships: List[RelationshipLite])-> pd.DataFrame:
     # Configure columns
     column_configuration = {
         "From": st.column_config.TextColumn("From", width=200),
@@ -43,7 +43,8 @@ def display_extraction_relationships(relationships: List[RelationshipLite]):
                               use_container_width=True,
                               num_rows="dynamic",
                               hide_index=False,)
-    st.session_state.edited_df = edited_df
+    return edited_df
+    #st.session_state.edited_df = edited_df
 
 def main():
     st.set_page_config(layout="wide", page_title="Document Graph App")
@@ -90,16 +91,8 @@ def main():
                 with st.spinner("Processing documents..."):
                     st.session_state.extracted_relationships = process_documents(uploaded_files)
                     st.session_state.relationships_extracted = True
-            display_extraction_relationships(st.session_state.extracted_relationships)
-            st.header("Relationships to Extract:")
-            st.write(st.session_state.edited_df)
-            allowed_relationships = df2json(st.session_state.edited_df)
-            st.header("Allowed Relationships:")
-            st.write(allowed_relationships)
-            allowed_entities = get_unique_entities(st.session_state.edited_df)
-            st.header("Allowed Entities:")
-            st.write(allowed_entities)
-        if st.button("Extract Graph"):
-            extract_graph(uploaded_files, allowed_relationships, allowed_entities)
+            st.session_state.edited_df = display_extraction_relationships(st.session_state.extracted_relationships)
+            if st.button("Extract Graph"):
+                extract_graph(uploaded_files, st.session_state.edited_df)
 if __name__ == "__main__":
     main()
