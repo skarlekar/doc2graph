@@ -137,7 +137,7 @@ def extract_graph(files: List, edited_df: pd.DataFrame) -> Dict:
     print(f"Allowed Nodes: {allowed_nodes}")    
 
     # Create a graph transformer
-    graph_transformer = LLMGraphTransformer(llm=llm, allowed_relationships=allowed_relationships, allowed_nodes=allowed_nodes, node_properties=True)
+    graph_transformer = LLMGraphTransformer(llm=llm, allowed_relationships=allowed_relationships, allowed_nodes=allowed_nodes, node_properties=True, relationship_properties=True)
 
     for file in files:
         content = extract_content(file)
