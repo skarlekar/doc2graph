@@ -5,7 +5,7 @@ from typing import List
 import os
 from json_data import sample_results
 from schema import Relationship, RelationshipList, RelationshipLite, RelationshipLiteList
-from utils import convert_to_lite, get_dataframe
+from utils import convert_to_lite, get_dataframe, df2json, get_unique_entities
 from llm import process_documents
 
 
@@ -94,5 +94,11 @@ def main():
             display_extraction_relationships(st.session_state.extracted_relationships)
             st.header("Relationships to Extract:")
             st.write(st.session_state.edited_df)
+            allowed_relationships = df2json(st.session_state.edited_df)
+            st.header("Allowed Relationships:")
+            st.write(allowed_relationships)
+            allowed_entities = get_unique_entities(st.session_state.edited_df)
+            st.header("Allowed Entities:")
+            st.write(allowed_entities)
 if __name__ == "__main__":
     main()

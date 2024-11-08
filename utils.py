@@ -32,3 +32,43 @@ def get_dataframe(results: List[RelationshipLite]) -> pd.DataFrame:
     # Convert to DataFrame
     df = pd.DataFrame(data)
     return df
+
+def df2json(df):
+    """
+    Convert a DataFrame with 'From', 'Relationship', 'To' columns to a list of tuples
+    
+    Args:
+        df (pandas.DataFrame): DataFrame containing the relationships
+        
+    Returns:
+        list: List of tuples in format [(from_node, relationship, to_node), ...]
+    """
+    if df.empty:
+        return []
+        
+    # Convert DataFrame rows to list of tuples
+    relationships = [
+        (str(row['From']), str(row['Relationship']), str(row['To'])) 
+        for _, row in df.iterrows()
+    ]
+    
+    return relationships
+
+def get_unique_entities(df):
+    """
+    Extract unique entities from the 'From' and 'To' columns of a DataFrame
+    
+    Args:
+        df (pandas.DataFrame): DataFrame containing 'From' and 'To' columns
+        
+    Returns:
+        list: List of unique entities sorted alphabetically
+    """
+    if df.empty:
+        return []
+        
+    # Combine 'From' and 'To' columns and get unique values
+    unique_entities = pd.concat([df['From'], df['To']]).unique().tolist()
+    
+    # Sort alphabetically for consistent output
+    return sorted(unique_entities)
