@@ -97,3 +97,15 @@ def insert_graph(graphs: list[Dict], uri: str, user: str, password: str, clear_e
         graphDBSession.add_graph_documents(graph, baseEntityLabel=True)
 
     return graphDBSession
+
+
+def to_sentence_case(text: str) -> str:
+    """Convert a string from any case to sentence case.
+    Example: 'HELLO_WORLD' -> 'Hello world'
+    """
+    # First convert to lowercase
+    text = text.lower()
+    # Replace underscores and hyphens with spaces
+    text = text.replace('_', ' ').replace('-', ' ')
+    # Capitalize first letter
+    return text.capitalize()
