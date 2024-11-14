@@ -5,17 +5,17 @@ from typing import List
 import os
 from json_data import sample_results
 from schema import Relationship, RelationshipList, RelationshipLite, RelationshipLiteList
-from utils import convert_to_lite, get_dataframe, df2json, get_unique_entities
+from utils import convert_to_lite, get_dataframe, df2json, get_unique_entities, insert_graph
 from llm import process_documents, extract_graph
 
 
 def initialize_session_state():
     if 'neo4j_url' not in st.session_state:
-        st.session_state.neo4j_url = ""
+        st.session_state.neo4j_url = os.getenv("NEO4J_URL", "")
     if 'neo4j_username' not in st.session_state:
-        st.session_state.neo4j_username = ""
+        st.session_state.neo4j_username = os.getenv("NEO4J_USERNAME", "")
     if 'neo4j_password' not in st.session_state:
-        st.session_state.neo4j_password = ""
+        st.session_state.neo4j_password = os.getenv("NEO4J_PASSWORD", "")
     if 'openai_api_key' not in st.session_state:
         # Initialize with environment variable if available
         st.session_state.openai_api_key = os.getenv("OPENAI_API_KEY", "")
@@ -25,6 +25,10 @@ def initialize_session_state():
         st.session_state.relationships_extracted = False
     if 'extracted_relationships' not in st.session_state:
         st.session_state.extracted_relationships = []
+    if 'extracted_graphs' not in st.session_state:
+        st.session_state.extracted_graphs = []
+    if 'graphDBSession' not in st.session_state:
+        st.session_state.graphDBSession = None
 
 def display_extraction_relationships(relationships: List[RelationshipLite])-> pd.DataFrame:
     # Configure columns
@@ -64,13 +68,10 @@ def main():
                      key="neo4j_password",
                      type="password",
                      placeholder="Enter password")
-        
-        # Only show OpenAI API key input if not in environment
-        if not os.getenv("OPENAI_API_KEY"):
-            st.text_input("OpenAI API Key",
-                         key="openai_api_key",
-                         type="password",
-                         placeholder="Enter your OpenAI API key")
+        st.text_input("OpenAI API Key",
+                     key="openai_api_key",
+                     type="password",
+                     placeholder="Enter your OpenAI API key")
 
     # Main content
     tab1, tab2 = st.tabs(["Documents to Graph", "Query Graph"])
@@ -93,6 +94,12 @@ def main():
                     st.session_state.relationships_extracted = True
             st.session_state.edited_df = display_extraction_relationships(st.session_state.extracted_relationships)
             if st.button("Extract Graph"):
-                extract_graph(uploaded_files, st.session_state.edited_df)
+                with st.spinner("Extracting graph..."):
+                    st.session_state.extracted_graphs = extract_graph(uploaded_files, st.session_state.edited_df)
+                with st.spinner("Inserting graph..."):
+                    graphDBSession = insert_graph(st.session_state.extracted_graphs, st.session_state.neo4j_url, st.session_state.neo4j_username, st.session_state.neo4j_password)
+                    st.session_state.graphDBSession = graphDBSession
+                    # Create a notification to the user to let them know the graph has been inserted
+                    st.success("Graph inserted successfully!")
 if __name__ == "__main__":
     main()

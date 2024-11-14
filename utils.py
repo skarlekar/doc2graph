@@ -1,8 +1,10 @@
 import pandas as pd
 import streamlit as st
-from typing import List
+from typing import List, Dict
 
 from schema import Relationship, RelationshipList, RelationshipLite, RelationshipLiteList
+from langchain_community.graphs import Neo4jGraph
+
 
 def convert_to_lite(relationships: List[Relationship]) -> List[RelationshipLite]:
     unique_results = []
@@ -72,3 +74,25 @@ def get_unique_entities(df):
     
     # Sort alphabetically for consistent output
     return sorted(unique_entities)
+
+def clean_graph(graphDBSession: Neo4jGraph):
+    query = """
+    MATCH (n)
+    DETACH DELETE n
+    """
+    graphDBSession.query(query)
+
+def create_graphDBSession(url: str, username: str, password: str, refresh_schema: bool = False) -> Neo4jGraph:    
+    return Neo4jGraph(url=url, username=username, password=password, refresh_schema=refresh_schema)
+
+# Function to insert the graph into the neo4j database. This function takes an array of graphs and inserts them into the database.
+def insert_graph(graphs: list[Dict], uri: str, user: str, password: str) -> Neo4jGraph:
+    # Initialize the Neo4j driver by using the credentials passed as parameters to this function
+    graphDBSession = create_graphDBSession(uri, user, password)
+    clean_graph(graphDBSession)
+
+    for graph in graphs:
+        print(f"Inserting graph: {graph}")
+        graphDBSession.add_graph_documents(graph, baseEntityLabel=True)
+
+    return graphDBSession

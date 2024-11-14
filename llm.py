@@ -124,7 +124,11 @@ def process_documents(files: List) -> List[RelationshipLite]:
             
     return all_results
 
-def extract_graph(files: List, edited_df: pd.DataFrame) -> Dict:
+def extract_graph(files: List, edited_df: pd.DataFrame) -> list[Dict]:
+    # Create an empty list to store the graphs
+    graphs = []
+
+    # Initialize the LLM
     llm = ChatOpenAI(
         model=LLM_CONFIG["model"],
         temperature=LLM_CONFIG["temperature"]
@@ -137,14 +141,25 @@ def extract_graph(files: List, edited_df: pd.DataFrame) -> Dict:
     print(f"Allowed Nodes: {allowed_nodes}")    
 
     # Create a graph transformer
-    graph_transformer = LLMGraphTransformer(llm=llm, allowed_relationships=allowed_relationships, allowed_nodes=allowed_nodes, node_properties=True, relationship_properties=True)
+    graph_transformer = LLMGraphTransformer(llm=llm, 
+                                            allowed_relationships=allowed_relationships, 
+                                            allowed_nodes=allowed_nodes, 
+                                            node_properties=True, 
+                                            relationship_properties=True)
 
     for file in files:
         content = extract_content(file)
         documents = [Document(page_content=content)]
-        graph = graph_transformer.convert_to_graph_documents(documents)
+        data = graph_transformer.convert_to_graph_documents(documents)
+        
+        graphs.append(data)
         print("-"*100)
-        print(f"Nodes:{graph[0].nodes}")
+        print(f"Nodes:{data[0].nodes}")
         print("-"*100)
-        print(f"Relationships:{graph[0].relationships}")
+        print(f"Relationships:{data[0].relationships}")
         print("-"*100)
+
+    return graphs
+
+
+        
