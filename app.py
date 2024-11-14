@@ -29,6 +29,10 @@ def initialize_session_state():
         st.session_state.extracted_graphs = []
     if 'graphDBSession' not in st.session_state:
         st.session_state.graphDBSession = None
+    if 'clear_graph' not in st.session_state:
+        st.session_state.clear_graph = False
+    if 'reextract' not in st.session_state:
+        st.session_state.reextract = False
 
 def display_extraction_relationships(relationships: List[RelationshipLite])-> pd.DataFrame:
     # Configure columns
@@ -72,6 +76,19 @@ def main():
                      key="openai_api_key",
                      type="password",
                      placeholder="Enter your OpenAI API key")
+        
+        # Add checkbox for graph clearing
+        st.session_state.clear_graph = st.checkbox(
+            "Clear existing graph before insertion",
+            value=False,
+            help="If checked, all existing nodes and relationships will be removed before inserting new data"
+        )
+        st.session_state.reextract = st.checkbox(
+            "Re-extract Relationships",
+            value=False,
+            help="If checked, the entities and relationships will be re-extracted from the documents"
+        )
+        
 
     # Main content
     tab1, tab2 = st.tabs(["Documents to Graph", "Query Graph"])
@@ -88,6 +105,8 @@ def main():
                 st.error("OpenAI API key not found. Please set it as an environment variable or enter it in the sidebar.")
             else:
                 os.environ["OPENAI_API_KEY"] = api_key
+            if st.session_state.reextract:
+                st.session_state.relationships_extracted = False
             if not st.session_state.relationships_extracted:
                 with st.spinner("Processing documents..."):
                     st.session_state.extracted_relationships = process_documents(uploaded_files)
@@ -97,7 +116,13 @@ def main():
                 with st.spinner("Extracting graph..."):
                     st.session_state.extracted_graphs = extract_graph(uploaded_files, st.session_state.edited_df)
                 with st.spinner("Inserting graph..."):
-                    graphDBSession = insert_graph(st.session_state.extracted_graphs, st.session_state.neo4j_url, st.session_state.neo4j_username, st.session_state.neo4j_password)
+                    graphDBSession = insert_graph(
+                        st.session_state.extracted_graphs, 
+                        st.session_state.neo4j_url, 
+                        st.session_state.neo4j_username, 
+                        st.session_state.neo4j_password,
+                        clear_existing=st.session_state.clear_graph  # Pass the checkbox value to insert_graph
+                    )
                     st.session_state.graphDBSession = graphDBSession
                     # Create a notification to the user to let them know the graph has been inserted
                     st.success("Graph inserted successfully!")

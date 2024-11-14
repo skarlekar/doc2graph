@@ -86,10 +86,11 @@ def create_graphDBSession(url: str, username: str, password: str, refresh_schema
     return Neo4jGraph(url=url, username=username, password=password, refresh_schema=refresh_schema)
 
 # Function to insert the graph into the neo4j database. This function takes an array of graphs and inserts them into the database.
-def insert_graph(graphs: list[Dict], uri: str, user: str, password: str) -> Neo4jGraph:
+def insert_graph(graphs: list[Dict], uri: str, user: str, password: str, clear_existing: bool = False) -> Neo4jGraph:
     # Initialize the Neo4j driver by using the credentials passed as parameters to this function
     graphDBSession = create_graphDBSession(uri, user, password)
-    clean_graph(graphDBSession)
+    if clear_existing:
+        clean_graph(graphDBSession)
 
     for graph in graphs:
         print(f"Inserting graph: {graph}")
