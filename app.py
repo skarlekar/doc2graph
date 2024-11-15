@@ -117,41 +117,41 @@ def visualize_graph():
                 relationship = record["r"]
                 
                 # Add start node if not already added
-                if start_node.id not in added_nodes:
+                if start_node.element_id not in added_nodes:
                     node_properties = dict(start_node)
                     #label = list(start_node.labels)[0]  # Get the first label
                     label = node_properties["id"]
                     title = f"{label}: {node_properties}"
-                    net.add_node(start_node.id, 
+                    net.add_node(start_node.element_id, 
                                label=label, 
                                title=title,
                                color="#97c2fc",
                                shape="box",
                                labelHighlightBold=True)
                                #font={'size': node_font_size, 'bold': True, 'color': 'red'})
-                    added_nodes.add(start_node.id)
+                    added_nodes.add(start_node.element_id)
                 
                 # Add end node if not already added
-                if end_node.id not in added_nodes:
+                if end_node.element_id not in added_nodes:
                     node_properties = dict(end_node)
                     #label = list(end_node.labels)[0]  # Get the first label
                     label = node_properties["id"]
                     title = f"{label}: {node_properties}"
-                    net.add_node(end_node.id, 
+                    net.add_node(end_node.element_id, 
                                label=label, 
                                title=title,
                                color="#97c2fc",
                                shape="box",
                                labelHighlightBold=True)
-                    added_nodes.add(end_node.id)
+                    added_nodes.add(end_node.element_id)
                 
                 # Add edge
                 rel_type = type(relationship).__name__
                 rel_type = to_sentence_case(rel_type)
                 rel_properties = dict(relationship)
                 title = f"{rel_type}: {rel_properties}"
-                net.add_edge(start_node.id, 
-                           end_node.id, 
+                net.add_edge(start_node.element_id, 
+                           end_node.element_id, 
                            label=rel_type,
                            title=title)
     
