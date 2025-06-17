@@ -10,9 +10,6 @@ from llm import process_documents, extract_graph
 from pyvis.network import Network
 import streamlit.components.v1 as components
 from neo4j import GraphDatabase
-from langchain.memory import ConversationBufferMemory
-from prompts import QA_PROMPT, CYPHER_GENERATION_PROMPT
-from utils import create_graph, create_qa_chain
 
 
 def initialize_session_state():
@@ -255,70 +252,5 @@ def main():
                     with st.spinner("Visualizing graph..."):
                         # Add visualization after successful insertion
                         visualize_graph()
-    with tab2:
-        st.title("Neo4j Graph Query Interface")
-        # Add refresh schema button
-        if st.button("Refresh Schema"):
-            st.session_state.graph = create_graph()
-            if st.session_state.graph:
-                st.session_state.graph.refresh_schema()
-                st.success("Schema refreshed successfully!")
-        # Create graph connection if not exists
-        if 'graph' not in st.session_state:
-            st.session_state.graph = create_graph()
-        
-        if st.session_state.graph:
-            # Display the graph schema
-            st.header("Graph Schema")
-            st.code(st.session_state.graph.schema, language="text")
-            
-            # Add a clear conversation button
-            if st.sidebar.button("Clear Conversation"):
-                if 'memory' in st.session_state:
-                    st.session_state.memory.clear()
-                    st.success("Conversation history cleared!")
-            
-            # Create query interface
-            st.header("Query Interface")
-            user_query = st.text_area("Enter your question:", height=100)
-            
-            if st.button("Submit Query"):
-                if not user_query:
-                    st.warning("Please enter a question.")
-                else:
-                    try:
-                        # Create QA chain
-                        chain = create_qa_chain(st.session_state.graph)
-                        
-                        # Execute query and get response
-                        with st.spinner("Processing query..."):
-                            result = chain({"query": user_query})
-                            
-                            # Display intermediate steps
-                            st.subheader("Generated Cypher Query:")
-                            if isinstance(result["intermediate_steps"], list):
-                                for step in result["intermediate_steps"]:
-                                    if "query" in step:
-                                        st.code(step["query"], language="cypher")
-                                    if "context" in step:
-                                        st.subheader("Query Context:")
-                                        st.json(step["context"])
-                            
-                            # Display final answer
-                            st.subheader("Answer:")
-                            st.write(result["result"])
-                            
-                            # Display conversation history
-                            if 'memory' in st.session_state:
-                                st.subheader("Conversation History:")
-                                for message in st.session_state.memory.chat_memory.messages:
-                                    if hasattr(message, 'content'):
-                                        st.text(f"{message.type}: {message.content}")
-                            
-                    except Exception as e:
-                        st.error(f"Error processing query: {str(e)}")
-                        st.exception(e)
-        else:
-            st.error("Unable to connect to Neo4j database. Please check your connection settings.")
 if __name__ == "__main__":
     main()

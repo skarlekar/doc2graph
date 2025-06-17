@@ -4,7 +4,12 @@ from typing import List, Dict
 
 from schema import Relationship, RelationshipList, RelationshipLite, RelationshipLiteList
 from langchain_community.graphs import Neo4jGraph
-
+from langchain.chains import GraphCypherQAChain
+from langchain_openai import ChatOpenAI
+from neo4j import GraphDatabase
+from config import LLM_CONFIG
+from langchain.memory import ConversationBufferMemory
+from prompts import CYPHER_GENERATION_PROMPT, QA_PROMPT
 
 def convert_to_lite(relationships: List[Relationship]) -> List[RelationshipLite]:
     unique_results = []
@@ -109,3 +114,58 @@ def to_sentence_case(text: str) -> str:
     text = text.replace('_', ' ').replace('-', ' ')
     # Capitalize first letter
     return text.capitalize()
+
+def create_graph():
+    """Create and return a Neo4j graph connection"""
+    try:
+        graph = Neo4jGraph(
+            url=st.session_state.neo4j_url,
+            username=st.session_state.neo4j_username,
+            password=st.session_state.neo4j_password,
+            enhanced_schema=True
+        )
+        return graph
+    except Exception as e:
+        st.error(f"Failed to connect to Neo4j: {str(e)}")
+        return None
+
+def create_qa_chain(graph):
+    """Create and return a GraphCypherQAChain with separate LLMs for Cypher and QA"""
+    # LLM for generating Cypher queries
+    cypher_llm = ChatOpenAI(
+        model=LLM_CONFIG["model"],
+        temperature=LLM_CONFIG["temperature"],
+        api_key=st.session_state.openai_api_key
+    )
+    
+    # LLM for generating natural language answers
+    qa_llm = ChatOpenAI(
+        model=LLM_CONFIG["model"],
+        temperature=LLM_CONFIG["temperature"],
+        api_key=st.session_state.openai_api_key
+    )
+    
+    # Initialize memory in session state if not exists
+    if 'memory' not in st.session_state:
+        st.session_state.memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True,
+            input_key="query",
+            output_key="result"
+        )
+    
+    # Create the chain with both LLMs, custom prompt, and memory
+    chain = GraphCypherQAChain.from_llm(
+        cypher_llm=cypher_llm,
+        qa_llm=qa_llm,
+        graph=graph,
+        verbose=True,
+        return_intermediate_steps=True,
+        validate_cypher=True,
+        allow_dangerous_requests=True,
+        cypher_prompt=CYPHER_GENERATION_PROMPT,
+        qa_prompt=QA_PROMPT,
+        memory=st.session_state.memory  # Add memory to the chain
+    )
+    
+    return chain
