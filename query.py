@@ -6,7 +6,7 @@ from langchain_openai import ChatOpenAI
 from neo4j import GraphDatabase
 from config import LLM_CONFIG
 from langchain_core.prompts.prompt import PromptTemplate
-
+from langchain.memory import ConversationBufferMemory
 QA_PROMPT_TEMPLATE = """
 You are an AI assistant that helps generate human-readable answers based on database query results.
 The latest prompt contains the information, and you need to generate a human readable response based on the given information.
@@ -37,14 +37,10 @@ Do not use any other relationship types or properties that are not provided.
 If the question is about a person, use the Person node.
 If the question is about an organization, use the Organization node.
 If the question is about a customer, use both Person and Organization nodes.
+When asked for customers, you need to consider both Person and Organization nodes.
+When constructing the Cypher query, all sub queries in an UNION must have the same return column names
+The MET_WITH, CO_WORKED_WITH, COORDINATED_WITH relationships are bidirectional relationships and should be used with <-[:MET_WITH]->, <-[:CO_WORKED_WITH]->, <-[:COORDINATED_WITH]-> respectively.
 
-Schema:
-{schema}
-
-Note: 
-1. When asked for customers, you need to consider both Person and Organization nodes.
-2. When constructing the Cypher query, all sub queries in an UNION must have the same return column names
-3. The MET_WITH, CO_WORKED_WITH, COORDINATED_WITH relationships are bidirectional relationships and should be used with <-[:MET_WITH]->, <-[:CO_WORKED_WITH]->, <-[:COORDINATED_WITH]-> respectively.
 Examples: Here are a few examples of generated Cypher statements for particular questions:
 # What is the revenue of NVIDIA?
 ```
@@ -97,8 +93,13 @@ RETURN type(r) AS relationship
 ```
 The result of the above query is either MET_WITH or COORDINATED_WITH. Therefore, the answer is "Yes, Alex Thompson knows Daniel Reed because they met with each other".
 
+Schema:
+{schema}
+
 The question is:
-{question}"""
+{question}
+
+"""
 
 CYPHER_GENERATION_PROMPT = PromptTemplate(
     input_variables=["schema", "question"], 
@@ -146,7 +147,16 @@ def create_qa_chain(graph):
         api_key=st.session_state.openai_api_key
     )
     
-    # Create the chain with both LLMs and custom prompt
+    # Initialize memory in session state if not exists
+    if 'memory' not in st.session_state:
+        st.session_state.memory = ConversationBufferMemory(
+            memory_key="chat_history",
+            return_messages=True,
+            input_key="query",
+            output_key="result"
+        )
+    
+    # Create the chain with both LLMs, custom prompt, and memory
     chain = GraphCypherQAChain.from_llm(
         cypher_llm=cypher_llm,
         qa_llm=qa_llm,
@@ -156,7 +166,8 @@ def create_qa_chain(graph):
         validate_cypher=True,
         allow_dangerous_requests=True,
         cypher_prompt=CYPHER_GENERATION_PROMPT,
-        qa_prompt=QA_PROMPT
+        qa_prompt=QA_PROMPT,
+        memory=st.session_state.memory  # Add memory to the chain
     )
     
     return chain
@@ -191,6 +202,12 @@ def main():
         st.header("Graph Schema")
         st.code(st.session_state.graph.schema, language="text")
         
+        # Add a clear conversation button
+        if st.sidebar.button("Clear Conversation"):
+            if 'memory' in st.session_state:
+                st.session_state.memory.clear()
+                st.success("Conversation history cleared!")
+        
         # Create query interface
         st.header("Query Interface")
         user_query = st.text_area("Enter your question:", height=100)
@@ -203,12 +220,11 @@ def main():
                     # Create QA chain
                     chain = create_qa_chain(st.session_state.graph)
                     
-                    # Execute query and get response with the correct input structure
+                    # Execute query and get response
                     with st.spinner("Processing query..."):
-                        # Pass the query in the correct format
                         result = chain({"query": user_query})
                         
-                        # Display intermediate steps (Cypher query and context)
+                        # Display intermediate steps
                         st.subheader("Generated Cypher Query:")
                         if isinstance(result["intermediate_steps"], list):
                             for step in result["intermediate_steps"]:
@@ -222,9 +238,16 @@ def main():
                         st.subheader("Answer:")
                         st.write(result["result"])
                         
+                        # Display conversation history
+                        if 'memory' in st.session_state:
+                            st.subheader("Conversation History:")
+                            for message in st.session_state.memory.chat_memory.messages:
+                                if hasattr(message, 'content'):
+                                    st.text(f"{message.type}: {message.content}")
+                        
                 except Exception as e:
                     st.error(f"Error processing query: {str(e)}")
-                    st.exception(e)  # This will show the full traceback
+                    st.exception(e)
     else:
         st.error("Unable to connect to Neo4j database. Please check your connection settings.")
 

@@ -25,16 +25,6 @@ def create_neo4j_session():
         st.error(f"Failed to connect to Neo4j: {str(e)}")
         return None
 
-def to_sentence_case(text: str) -> str:
-    """Convert a string from any case to sentence case.
-    Example: 'HELLO_WORLD' -> 'Hello world'
-    """
-    # First convert to lowercase
-    text = text.lower()
-    # Replace underscores and hyphens with spaces
-    text = text.replace('_', ' ').replace('-', ' ')
-    # Capitalize first letter
-    return text.capitalize()
 def visualize_graph():
     """Fetch data from Neo4j and create a visualization"""
     driver = create_neo4j_session()
@@ -43,29 +33,8 @@ def visualize_graph():
     
     try:
         # Create a PyVis network
-        net = Network(height="750px", width="100%", bgcolor="#ffffff")
+        net = Network(height="750px", width="100%", bgcolor="#ffffff", font_color="black")
         
-        #Set global options for all nodes
-        net.set_options("""
-        {
-          "nodes": {
-                "font": {
-                    "size": 9,
-                    "color": "red",
-                    "bold": true
-                }
-          },
-          "edges": {
-            "font": {
-                "size": 8,
-                "color": "#000080",
-                "align": "middle"
-            }
-          }
-        }
-        """)
-        
-        node_font_size = 9
         # Fetch all nodes and relationships
         with driver.session(database="neo4j") as session:
             # Query to get all nodes and relationships
@@ -89,35 +58,27 @@ def visualize_graph():
                 # Add start node if not already added
                 if start_node.id not in added_nodes:
                     node_properties = dict(start_node)
-                    #label = list(start_node.labels)[0]  # Get the first label
-                    label = node_properties["id"]
+                    label = list(start_node.labels)[0]  # Get the first label
                     title = f"{label}: {node_properties}"
                     net.add_node(start_node.id, 
                                label=label, 
                                title=title,
-                               color="#97c2fc",
-                               shape="box",
-                               labelHighlightBold=True)
-                               #font={'size': node_font_size, 'bold': True, 'color': 'red'})
+                               color="#97c2fc")
                     added_nodes.add(start_node.id)
                 
                 # Add end node if not already added
                 if end_node.id not in added_nodes:
                     node_properties = dict(end_node)
-                    #label = list(end_node.labels)[0]  # Get the first label
-                    label = node_properties["id"]
+                    label = list(end_node.labels)[0]  # Get the first label
                     title = f"{label}: {node_properties}"
                     net.add_node(end_node.id, 
                                label=label, 
                                title=title,
-                               color="#97c2fc",
-                               shape="box",
-                               labelHighlightBold=True)
+                               color="#97c2fc")
                     added_nodes.add(end_node.id)
                 
                 # Add edge
                 rel_type = type(relationship).__name__
-                rel_type = to_sentence_case(rel_type)
                 rel_properties = dict(relationship)
                 title = f"{rel_type}: {rel_properties}"
                 net.add_edge(start_node.id, 

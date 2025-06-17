@@ -58,7 +58,7 @@ def process_documents_sample(files: List) -> List[RelationshipLite]:
 # Process the documents and extract the relationships
 def process_documents(files: List) -> List[RelationshipLite]:
     llm = ChatOpenAI(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         temperature=0
     )
 
@@ -153,34 +153,56 @@ def get_dataframe(results: List[RelationshipLite]) -> pd.DataFrame:
     df = pd.DataFrame(data)
     return df
 
-def display_extraction_results(results: List[RelationshipLite]):
-    # Configure columns
-    column_configuration = {
-        "From": st.column_config.TextColumn("From", width=200),
-        "Relationship": st.column_config.TextColumn("Relationship", width=200),
-        "To": st.column_config.TextColumn("To", width=200)
-    }
-
-
-    st.header("All Relationships")
-
-    df = get_dataframe(results)
-
-    event = st.dataframe(
-        df,
-        column_config=column_configuration,
-        use_container_width=True,
-        hide_index=True,
-        on_select="rerun",
-        selection_mode="multi-row",
-    )
-
-    st.header("Selected Relationships")
-    selected_relationships = event.selection.rows
-    filtered_df = df.iloc[selected_relationships]
-    st.dataframe(
-        filtered_df,
-        column_config=column_configuration,
-        use_container_width=True,
-    )
+def display_extraction_results():
+    if 'extraction_results' not in st.session_state:
+        return
+    
+    # Initialize container for the grid
+    grid_container = st.container()
+    
+    with grid_container:
+        # Create a list of dictionaries with the correct column names
+        data = [{
+            'From': item.head_type,
+            'Relationship': item.relation,
+            'To': item.tail_type
+        } for item in st.session_state.extraction_results]
+        
+        # Convert to DataFrame
+        df = pd.DataFrame(data)
+        
+        # Configure columns
+        column_config = {
+            "From": st.column_config.TextColumn("From", width=200),
+            "Relationship": st.column_config.TextColumn("Relationship", width=200),
+            "To": st.column_config.TextColumn("To", width=200)
+        }
+        
+        # Display the dataframe with selection enabled
+        st.subheader("Extracted Relationships")
+        selection = st.dataframe(
+            df,
+            column_config=column_config,
+            use_container_width=True,
+            hide_index=True,
+            selection_mode="multi-row",
+            key="relationship_grid"  # Add a unique key
+        )
+        
+        # Create a columns layout for the button
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        # Handle deletions if rows are selected
+        if selection.selected_rows:
+            with col1:
+                if st.button("Delete Selected Rows", key="delete_button"):
+                    indices_to_delete = [i for i in selection.selected_rows]
+                    # Update the session state
+                    st.session_state.extraction_results = [
+                        item for i, item in enumerate(st.session_state.extraction_results) 
+                        if i not in indices_to_delete
+                    ]
+                    # Clear the selection
+                    st.session_state.relationship_grid = None
+                    st.rerun()
 

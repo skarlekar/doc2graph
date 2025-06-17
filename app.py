@@ -194,10 +194,12 @@ def main():
         if neo4j_password:
             st.session_state.neo4j_password = neo4j_password
             
-        st.text_input("OpenAI API Key",
-                     key="openai_api_key",
-                     type="password",
-                     placeholder="Enter your OpenAI API key")
+        # Only show OpenAI API key input if not in environment
+        if not os.getenv("OPENAI_API_KEY"):
+            st.text_input("OpenAI API Key",
+                         key="openai_api_key",
+                         type="password",
+                         placeholder="Enter your OpenAI API key")
         
         # Add checkbox for graph clearing
         st.session_state.clear_graph = st.checkbox(
