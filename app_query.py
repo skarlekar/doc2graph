@@ -1,27 +1,9 @@
-"""
-Doc2Graph Streamlit Application
-
-This module provides a web-based interface for converting unstructured documents
-into knowledge graphs and querying them using natural language. The application
-uses Streamlit for the UI, Neo4j for graph storage, and OpenAI's GPT models for
-document processing and natural language understanding.
-
-Main Features:
-- Document upload and processing (PDF, DOCX, TXT)
-- Entity and relationship extraction
-- Interactive graph visualization
-- Natural language querying
-- Neo4j database integration
-
-Author: [Your Name]
-Date: [Current Date]
-"""
-
 import numpy as np
 import pandas as pd
 import streamlit as st
 from typing import List
 import os
+from docs.ancillary.json_data import sample_results
 from schema import Relationship, RelationshipList, RelationshipLite, RelationshipLiteList
 from utils import convert_to_lite, get_dataframe, df2json, get_unique_entities, insert_graph, to_sentence_case
 from llm import process_documents, extract_graph
@@ -34,26 +16,6 @@ from utils import create_graph, create_qa_chain
 
 
 def initialize_session_state():
-    """
-    Initialize Streamlit session state variables with default values.
-    
-    This function sets up all the necessary session state variables that persist
-    across user interactions. It initializes database connection parameters,
-    API keys, and application state variables.
-    
-    Session State Variables:
-    - neo4j_url: Neo4j database connection URL
-    - neo4j_username: Neo4j database username
-    - neo4j_password: Neo4j database password
-    - openai_api_key: OpenAI API key for LLM operations
-    - edited_df: DataFrame containing edited relationships
-    - relationships_extracted: Boolean flag indicating if relationships have been extracted
-    - extracted_relationships: List of extracted relationships from documents
-    - extracted_graphs: List of generated graph documents
-    - graphDBSession: Neo4j database session object
-    - clear_graph: Boolean flag to clear existing graph before insertion
-    - reextract: Boolean flag to re-extract relationships from documents
-    """
     if 'neo4j_url' not in st.session_state:
         st.session_state.neo4j_url = os.getenv("NEO4J_URL", "")
     if 'neo4j_username' not in st.session_state:
@@ -78,69 +40,28 @@ def initialize_session_state():
     if 'reextract' not in st.session_state:
         st.session_state.reextract = False
 
-
-def display_extraction_relationships(relationships: List[RelationshipLite]) -> pd.DataFrame:
-    """
-    Display extracted relationships in an interactive data editor.
-    
-    This function creates a Streamlit data editor that allows users to view and
-    modify the extracted relationships from uploaded documents. Users can edit
-    entity names, relationship types, and add/remove relationships before
-    generating the knowledge graph.
-    
-    Args:
-        relationships (List[RelationshipLite]): List of extracted relationships
-            from document processing
-        
-    Returns:
-        pd.DataFrame: Edited DataFrame containing the relationships with user
-            modifications
-        
-    Features:
-        - Interactive table with editable cells
-        - Dynamic row addition/removal
-        - Column configuration for better UX
-        - Real-time data validation
-    """
-    # Configure columns for better user experience
+def display_extraction_relationships(relationships: List[RelationshipLite])-> pd.DataFrame:
+    # Configure columns
     column_configuration = {
         "From": st.column_config.TextColumn("From", width=200),
         "Relationship": st.column_config.TextColumn("Relationship", width=200),
         "To": st.column_config.TextColumn("To", width=200)
     }
 
-    # Convert relationships to DataFrame for display
     df = get_dataframe(relationships)
 
-    # Display header and instructions
     st.header("Relationships")
     st.write("Edit the entities and relationships in the table below. When you are done, click the 'Extract' button to extract the information from the documents.")
-    
-    # Create interactive data editor
     edited_df = st.data_editor(df,
                               column_config=column_configuration,
                               use_container_width=True,
                               num_rows="dynamic",
                               hide_index=False,)
     return edited_df
-
+    #st.session_state.edited_df = edited_df
 
 def create_neo4j_session():
-    """
-    Create and return a Neo4j database session.
-    
-    This function establishes a connection to the Neo4j database using the
-    credentials stored in the session state. It handles connection errors
-    gracefully and provides user feedback.
-    
-    Returns:
-        GraphDatabase.driver: Neo4j driver object if connection successful,
-            None otherwise
-        
-    Error Handling:
-        - Displays error message if connection fails
-        - Returns None to allow graceful error handling in calling functions
-    """
+    """Create and return a Neo4j session using environment variables"""
     try:
         driver = GraphDatabase.driver(
             st.session_state.neo4j_url,
@@ -151,33 +72,11 @@ def create_neo4j_session():
         st.error(f"Failed to connect to Neo4j: {str(e)}")
         return None
 
-
 def visualize_graph():
-    """
-    Create and display an interactive graph visualization.
-    
-    This function fetches graph data from Neo4j, creates a PyVis network
-    visualization, and displays it in the Streamlit interface. The visualization
-    shows nodes (entities) and edges (relationships) with customizable styling.
-    
-    Process:
-        1. Connect to Neo4j database
-        2. Query all nodes and relationships
-        3. Create PyVis network with custom styling
-        4. Add nodes and edges to the network
-        5. Generate HTML visualization
-        6. Display in Streamlit interface
-        
-    Features:
-        - Interactive node and edge highlighting
-        - Custom node colors and shapes
-        - Hover tooltips with node/edge details
-        - Responsive layout
-        - Automatic duplicate node handling
-    """
     # Create a Neo4j session using the URL, username, and password from the st.session_state objects
     driver = create_neo4j_session()
 
+    
     # Fetch graph data from Neo4j
     with st.spinner("Fetching graph data..."):
         query = """
@@ -191,7 +90,7 @@ def visualize_graph():
             # Create a PyVis network
             net = Network(height="750px", width="100%", notebook=True)
 
-            # Set global options for all nodes
+            #Set global options for all nodes
             net.set_options("""
             {
                 "nodes": {
@@ -223,7 +122,7 @@ def visualize_graph():
                 # Add start node if not already added
                 if start_node.element_id not in added_nodes:
                     node_properties = dict(start_node)
-                    # label = list(start_node.labels)[0]  # Get the first label
+                    #label = list(start_node.labels)[0]  # Get the first label
                     label = node_properties["id"]
                     title = f"{label}: {node_properties}"
                     net.add_node(start_node.element_id, 
@@ -232,12 +131,13 @@ def visualize_graph():
                                color="#97c2fc",
                                shape="box",
                                labelHighlightBold=True)
+                               #font={'size': node_font_size, 'bold': True, 'color': 'red'})
                     added_nodes.add(start_node.element_id)
                 
                 # Add end node if not already added
                 if end_node.element_id not in added_nodes:
                     node_properties = dict(end_node)
-                    # label = list(end_node.labels)[0]  # Get the first label
+                    #label = list(end_node.labels)[0]  # Get the first label
                     label = node_properties["id"]
                     title = f"{label}: {node_properties}"
                     net.add_node(end_node.element_id, 
@@ -270,41 +170,14 @@ def visualize_graph():
     # Close the driver when done
     driver.close()
 
-
 def main():
-    """
-    Main application function that sets up the Streamlit interface.
-    
-    This function initializes the application, creates the user interface,
-    and handles all user interactions. It manages two main tabs:
-    1. Documents to Graph: For document upload and graph generation
-    2. Query Graph: For natural language querying of the knowledge graph
-    
-    Interface Components:
-        - Sidebar: Configuration and settings
-        - Tab 1: Document processing and graph generation
-        - Tab 2: Natural language querying
-        
-    User Workflow:
-        1. Configure database and API settings in sidebar
-        2. Upload documents in Tab 1
-        3. Review and edit extracted relationships
-        4. Generate knowledge graph
-        5. Switch to Tab 2 for querying
-        6. Ask natural language questions
-        7. View results and generated Cypher queries
-    """
-    # Configure Streamlit page settings
     st.set_page_config(layout="wide", page_title="Document Graph App")
-    
     # Initialize session state
     initialize_session_state()
 
-    # Sidebar - Admin Section
+        # Sidebar - Admin Section
     with st.sidebar:
         st.header("Admin")
-        
-        # Neo4j Connection Settings
         neo4j_url = st.text_input("Neo4j URL", 
                                  value=st.session_state.neo4j_url,
                                  placeholder="bolt://localhost:7687")
@@ -324,14 +197,14 @@ def main():
         if neo4j_password:
             st.session_state.neo4j_password = neo4j_password
             
-        # OpenAI API Key Input (only show if not in environment)
+        # Only show OpenAI API key input if not in environment
         if not os.getenv("OPENAI_API_KEY"):
             st.text_input("OpenAI API Key",
                          key="openai_api_key",
                          type="password",
                          placeholder="Enter your OpenAI API key")
         
-        # Graph Management Options
+        # Add checkbox for graph clearing
         st.session_state.clear_graph = st.checkbox(
             "Clear existing graph before insertion",
             value=True,
@@ -342,41 +215,30 @@ def main():
             value=False,
             help="If checked, the entities and relationships will be re-extracted from the documents"
         )
+        
 
-    # Main content area with tabs
+    # Main content
     tab1, tab2 = st.tabs(["Documents to Graph", "Query Graph"])
     
-    # Tab 1: Document Processing and Graph Generation
     with tab1:
         st.header("Upload Documents")
-        
-        # File upload widget
         uploaded_files = st.file_uploader("Choose files", 
                                         accept_multiple_files=True,
                                         type=['txt', 'pdf', 'docx'])
         
         if uploaded_files:
-            # Validate OpenAI API key
             api_key = os.getenv("OPENAI_API_KEY") or st.session_state.openai_api_key
             if not api_key:
                 st.error("OpenAI API key not found. Please set it as an environment variable or enter it in the sidebar.")
             else:
                 os.environ["OPENAI_API_KEY"] = api_key
-                
-            # Handle re-extraction flag
             if st.session_state.reextract:
                 st.session_state.relationships_extracted = False
-                
-            # Process documents if relationships haven't been extracted
             if not st.session_state.relationships_extracted:
                 with st.spinner("Processing documents..."):
                     st.session_state.extracted_relationships = process_documents(uploaded_files)
                     st.session_state.relationships_extracted = True
-                    
-            # Display and edit relationships
             st.session_state.edited_df = display_extraction_relationships(st.session_state.extracted_relationships)
-            
-            # Graph extraction button
             if st.button("Extract Graph"):
                 with st.spinner("Extracting graph..."):
                     st.session_state.extracted_graphs = extract_graph(uploaded_files, st.session_state.edited_df)
@@ -393,18 +255,14 @@ def main():
                     with st.spinner("Visualizing graph..."):
                         # Add visualization after successful insertion
                         visualize_graph()
-    
-    # Tab 2: Natural Language Querying
     with tab2:
         st.title("Neo4j Graph Query Interface")
-        
-        # Schema refresh functionality
+        # Add refresh schema button
         if st.button("Refresh Schema"):
             st.session_state.graph = create_graph()
             if st.session_state.graph:
                 st.session_state.graph.refresh_schema()
                 st.success("Schema refreshed successfully!")
-                
         # Create graph connection if not exists
         if 'graph' not in st.session_state:
             st.session_state.graph = create_graph()
@@ -414,13 +272,13 @@ def main():
             st.header("Graph Schema")
             st.code(st.session_state.graph.schema, language="text")
             
-            # Conversation management
+            # Add a clear conversation button
             if st.sidebar.button("Clear Conversation"):
                 if 'memory' in st.session_state:
                     st.session_state.memory.clear()
                     st.success("Conversation history cleared!")
             
-            # Query interface
+            # Create query interface
             st.header("Query Interface")
             user_query = st.text_area("Enter your question:", height=100)
             
@@ -429,14 +287,14 @@ def main():
                     st.warning("Please enter a question.")
                 else:
                     try:
-                        # Create QA chain for processing queries
+                        # Create QA chain
                         chain = create_qa_chain(st.session_state.graph)
                         
                         # Execute query and get response
                         with st.spinner("Processing query..."):
                             result = chain({"query": user_query})
                             
-                            # Display intermediate steps (Cypher queries)
+                            # Display intermediate steps
                             st.subheader("Generated Cypher Query:")
                             if isinstance(result["intermediate_steps"], list):
                                 for step in result["intermediate_steps"]:
@@ -462,7 +320,5 @@ def main():
                         st.exception(e)
         else:
             st.error("Unable to connect to Neo4j database. Please check your connection settings.")
-
-
 if __name__ == "__main__":
     main()
